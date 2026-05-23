@@ -1,4 +1,4 @@
 Flask==2.3.2
-lxml==4.9.2
+lxml==5.2.2
 requests==2.31.0
 Werkzeug==2.3.6
