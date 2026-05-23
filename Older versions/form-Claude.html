@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MARLY 1.0 - SAR Search Planner</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+.container { max-width: 640px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+.header-text h1 { margin-bottom: 5px; color: #333; }
+.header-text .subtitle { color: #666; font-size: 14px; }
+.logo { width: 100px; height: auto; }
+.form-group { margin-bottom: 20px; }
+label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+.label-hint { font-weight: normal; font-size: 12px; color: #888; display: block; margin-top: 2px; }
+input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+textarea { resize: vertical; min-height: 80px; }
+.step-indicator { display: flex; margin-bottom: 30px; }
+.step-tab { flex: 1; text-align: center; padding: 10px; font-size: 13px; font-weight: bold; border-bottom: 3px solid #ddd; color: #999; cursor: pointer; }
+.step-tab.active { border-bottom: 3px solid #0066cc; color: #0066cc; }
+.step-tab.completed { border-bottom: 3px solid #28a745; color: #28a745; }
+.step-panel { display: none; }
+.step-panel.active { display: block; }
+.button-group { display: flex; gap: 10px; margin-top: 10px; }
+.btn { flex: 1; padding: 12px; color: white; border: none; border-radius: 4px; font-size: 15px; cursor: pointer; }
+.btn-save { background: #0066cc; }
+.btn-next { background: #0066cc; }
+.btn-back { background: #6c757d; }
+.btn-generate { background: #28a745; }
+.btn-hasty { background: #dc6900; }
+.btn-download { background: #dc6900; width: 100%; margin-top: 15px; padding: 14px; font-size: 16px; font-weight: bold; }
+.message { padding: 10px; margin-bottom: 20px; border-radius: 4px; display: none; }
+.success { background: #d4edda; color: #155724; }
+.error { background: #f8d7da; color: #721c24; }
+.results { padding: 15px; margin-top: 20px; border-radius: 4px; background: #e8f4fd; border: 1px solid #b8daff; display: none; }
+.results h3 { margin-bottom: 10px; color: #004085; }
+.results p { margin-bottom: 5px; font-size: 14px; }
+.sector-list { margin-top: 10px; max-height: 200px; overflow-y: auto; }
+.sector-item { padding: 5px 10px; margin: 3px 0; background: white; border-radius: 4px; font-size: 12px; display: flex; justify-content: space-between; }
+.weight-high { font-weight: bold; color: #c82333; }
+.profile-preview { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 12px; margin-bottom: 20px; font-size: 13px; }
+.two-col { display: flex; gap: 16px; }
+.two-col .form-group { flex: 1; }
+.shape-toggle, .source-toggle, .unit-toggle { display: flex; gap: 0; margin-bottom: 15px; }
+.shape-option, .source-option, .unit-option { flex: 1; padding: 10px; text-align: center; border: 2px solid #ddd; cursor: pointer; font-size: 13px; font-weight: bold; color: #666; }
+.shape-option:first-child, .source-option:first-child, .unit-option:first-child { border-radius: 4px 0 0 4px; }
+.shape-option:last-child, .source-option:last-child, .unit-option:last-child { border-radius: 0 4px 4px 0; }
+.shape-option.active, .source-option.active, .unit-option.active { border-color: #0066cc; background: #e8f0fe; color: #0066cc; }
+.grid-options { display: block; }
+.grid-options.hidden { display: none; }
+.pie-options { display: none; }
+.pie-options.active { display: block; }
+.toggle-container { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; padding: 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }
+.toggle-switch { position: relative; width: 50px; height: 26px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 26px; transition: 0.3s; }
+.toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+.toggle-switch input:checked + .toggle-slider { background: #28a745; }
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(24px); }
+.terrain-info { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 10px; margin-bottom: 10px; font-size: 13px; color: #155724; }
+.loading { display: none; padding: 15px; text-align: center; color: #666; }
+.loading.active { display: block; }
+.ring-row { display: flex; align-items: center; gap: 12px; padding: 10px; margin: 4px 0; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }
+.ring-row.checked { background: #e8f0fe; border-color: #b8d4fe; }
+.ring-checkbox { width: auto; flex-shrink: 0; }
+.ring-label { font-size: 14px; font-weight: bold; min-width: 50px; }
+.ring-distance { width: 80px; padding: 6px 8px; font-size: 13px; text-align: center; }
+.ring-km { font-size: 13px; color: #666; }
+.ring-pct-25 { border-left: 4px solid #28a745; }
+.ring-pct-50 { border-left: 4px solid #ffc107; }
+.ring-pct-75 { border-left: 4px solid #fd7e14; }
+.ring-pct-95 { border-left: 4px solid #dc3545; }
+.section-label { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; }
+.marker-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px; margin: 6px 0; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }
+.marker-row.checked { background: #e8f0fe; border-color: #b8d4fe; }
+.marker-checkbox { width: auto; flex-shrink: 0; margin-top: 4px; }
+.marker-content { flex: 1; }
+.marker-name { font-size: 14px; font-weight: bold; color: #333; margin-bottom: 6px; }
+.marker-fields { display: none; margin-top: 8px; }
+.marker-row.checked .marker-fields { display: block; }
+.marker-coords { display: flex; gap: 8px; margin-bottom: 6px; }
+.marker-coords input { width: 50%; padding: 6px 8px; font-size: 13px; }
+.marker-notes input { width: 100%; padding: 6px 8px; font-size: 13px; }
+.marker-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; width: 28px; text-align: center; }
+.terrain-source-panel { display: none; margin-bottom: 15px; }
+.terrain-source-panel.active { display: block; }
+.file-upload-area { border: 2px dashed #ccc; border-radius: 4px; padding: 15px; text-align: center; margin-bottom: 10px; }
+.file-upload-area.uploaded { border-color: #28a745; background: #f0fff0; }
+.file-status { font-size: 13px; color: #666; margin-top: 8px; }
+.file-status.success { color: #155724; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="header-text"><h1>MARLY 1.0</h1><p class="subtitle">Model-Assisted Rescue for Lost-person recoverY</p></div>
+        <img src="/static/marly_logo.png" alt="MARLY Logo" class="logo">
+    </div>
+    <div id="message" class="message"></div>
+    <div class="step-indicator">
+        <div class="step-tab active" id="tab1" onclick="showStep(1)">Step 1: Subject</div>
+        <div class="step-tab" id="tab2" onclick="showStep(2)">Step 2: Parameters</div>
+        <div class="step-tab" id="tab3" onclick="showStep(3)">Step 3: Markers</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step-panel active" id="step1">
+        <div class="form-group"><label>Subject Type *</label><select id="subject_type" required onchange="updateProfilePreview()"><option value="">-- Select --</option><option value="dementia">Dementia / Alzheimer's</option><option value="lost_child">Lost Child</option><option value="lost_hiker">Lost Hiker</option><option value="lost_hunter">Lost Hunter</option><option value="lost_vehicle">Lost Vehicle</option><option value="mental_health">Mental Health Crisis</option></select></div>
+        <div id="profilePreview" class="profile-preview" style="display:none;"></div>
+        <div class="form-group"><label>Last Known Latitude *</label><input type="number" id="latitude" step="0.0001" required placeholder="e.g. 35.6870"></div>
+        <div class="form-group"><label>Last Known Longitude *</label><input type="number" id="longitude" step="0.0001" required placeholder="e.g. -105.9378"></div>
+        <div class="form-group"><label>Time Last Seen</label><input type="datetime-local" id="time_last_seen"></div>
+        <div class="two-col">
+            <div class="form-group"><label>Age</label><input type="number" id="age" min="0" max="130" placeholder="e.g. 67"></div>
+            <div class="form-group"><label>Terrain Type</label><select id="terrain"><option value="">-- Select --</option><option value="urban">Urban</option><option value="rural">Rural</option><option value="forested">Forested</option><option value="mountainous">Mountainous</option><option value="desert">Desert</option><option value="water">Water / Coastal</option></select></div>
+        </div>
+        <div class="form-group"><label>Notes / Additional Info</label><textarea id="notes" placeholder="Include direction of travel if known..."></textarea></div>
+        <div class="button-group">
+            <button type="button" class="btn btn-save" onclick="saveSearchPlan()">Save</button>
+            <button type="button" class="btn btn-hasty" onclick="launchHasty()">Hasty Search</button>
+            <button type="button" class="btn btn-next" onclick="goToStep2()">Full Plan &rarr;</button>
+        </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step-panel" id="step2">
+        <div id="step2Summary" class="profile-preview" style="margin-bottom:15px;"></div>
+
+        <label>Units</label>
+        <div class="unit-toggle">
+            <div class="unit-option active" id="unit_std" onclick="setUnits('standard')">Standard (mi/ft/acres)</div>
+            <div class="unit-option" id="unit_met" onclick="setUnits('metric')">Metric (km/m/sq km)</div>
+        </div>
+
+        <div class="section-label">Probability Rings</div>
+        <div id="ringUnitLabel" style="font-size:12px;color:#888;margin-bottom:8px;">Distances in miles</div>
+        <div class="ring-row ring-pct-25" id="ringRow25"><input type="checkbox" class="ring-checkbox" id="ring_25" onchange="toggleRingRow(25)"><span class="ring-label">25%</span><input type="number" class="ring-distance" id="ring_25_km" step="0.1" min="0.1" disabled><span class="ring-km" id="ring25unit">mi</span></div>
+        <div class="ring-row ring-pct-50 checked" id="ringRow50"><input type="checkbox" class="ring-checkbox" id="ring_50" checked onchange="toggleRingRow(50)"><span class="ring-label">50%</span><input type="number" class="ring-distance" id="ring_50_km" step="0.1" min="0.1"><span class="ring-km" id="ring50unit">mi</span></div>
+        <div class="ring-row ring-pct-75" id="ringRow75"><input type="checkbox" class="ring-checkbox" id="ring_75" onchange="toggleRingRow(75)"><span class="ring-label">75%</span><input type="number" class="ring-distance" id="ring_75_km" step="0.1" min="0.1" disabled><span class="ring-km" id="ring75unit">mi</span></div>
+        <div class="ring-row ring-pct-95 checked" id="ringRow95"><input type="checkbox" class="ring-checkbox" id="ring_95" checked onchange="toggleRingRow(95)"><span class="ring-label">95%</span><input type="number" class="ring-distance" id="ring_95_km" step="0.1" min="0.1"><span class="ring-km" id="ring95unit">mi</span></div>
+
+        <div class="section-label" style="margin-top:20px">Sector Configuration</div>
+        <label>Sector Shape</label>
+        <div class="shape-toggle">
+            <div class="shape-option active" id="shape_grid" onclick="setShape('grid')">&#9632; Grid Squares (default)</div>
+            <div class="shape-option" id="shape_pie" onclick="setShape('pie')">&#9660; Pie Sectors</div>
+        </div>
+        <div class="grid-options" id="gridOptions"><div class="form-group"><label id="gridLabel">Grid Cell Size (acres)<span class="label-hint">Area of each square sector</span></label><input type="number" id="grid_cell_size" step="1" min="1" value="30" placeholder="e.g. 30"></div></div>
+        <div class="pie-options" id="pieOptions"><div class="form-group"><label id="pieLabel">Max Sector Size (acres)</label><input type="number" id="max_sector_size" step="1" min="1" placeholder="e.g. 30"></div></div>
+
+        <div class="section-label" style="margin-top:20px">Terrain-Aware Weighting</div>
+        <div class="toggle-container"><label class="toggle-switch"><input type="checkbox" id="terrain_aware" onchange="toggleTerrainPanel()"><span class="toggle-slider"></span></label><div><span style="font-weight:bold">Enable Terrain Weighting</span><br><span style="font-size:12px;color:#888">Bias sectors by trail/road data</span></div></div>
+        <div class="terrain-source-panel" id="terrainSourcePanel">
+            <label>Data Source</label>
+            <div class="source-toggle"><div class="source-option active" id="src_osm" onclick="setTerrainSource('osm')">OpenStreetMap</div><div class="source-option" id="src_file" onclick="setTerrainSource('file')">Upload File</div></div>
+            <div id="osmInfo" class="terrain-info">Auto-fetch trails/roads. Requires internet.</div>
+            <div id="fileUploadPanel" style="display:none;">
+                <div class="file-upload-area" id="fileUploadArea"><input type="file" id="trail_file" accept=".kml,.gpx" onchange="uploadTrailFile()" style="display:none;"><button type="button" onclick="document.getElementById('trail_file').click()" style="padding:10px 20px;background:#0066cc;color:white;border:none;border-radius:4px;cursor:pointer">Choose KML or GPX File</button><div class="file-status" id="fileStatus">No file uploaded</div></div>
+            </div>
+        </div>
+
+        <div class="section-label" style="margin-top:20px">Team Information</div>
+        <div class="two-col">
+            <div class="form-group"><label>Number of Teams</label><input type="number" id="num_teams" min="1" max="50" placeholder="e.g. 6"></div>
+            <div class="form-group"><label>Team Capability</label><select id="team_capability"><option value="">-- Select --</option><option value="ground">Ground</option><option value="mounted">Mounted</option><option value="k9">K9</option><option value="aerial">Aerial</option><option value="mixed">Mixed</option></select></div>
+        </div>
+        <div class="form-group"><label>Hours Since Last Seen</label><input type="number" id="urgency_hours" min="0" step="1" placeholder="e.g. 4"></div>
+        <div class="button-group">
+            <button type="button" class="btn btn-back" onclick="goToStep1()">&larr; Back</button>
+            <button type="button" class="btn btn-next" onclick="goToStep3()">Markers &rarr;</button>
+        </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-panel" id="step3">
+        <div class="section-label">Operational Map Markers</div>
+        <p style="font-size:13px;color:#666;margin-bottom:15px;">Check to add. Leave coordinates blank to auto-place.</p>
+        <div class="marker-row" id="markerRow_icp"><input type="checkbox" class="marker-checkbox" id="marker_icp" onchange="toggleMarker('icp')"><span class="marker-icon">&#9873;</span><div class="marker-content"><div class="marker-name">Incident Command Post (ICP)</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_icp_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_icp_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_icp_notes" placeholder="Notes"></div></div></div></div>
+        <div class="marker-row" id="markerRow_ipp"><input type="checkbox" class="marker-checkbox" id="marker_ipp" onchange="toggleMarker('ipp')"><span class="marker-icon">&#128205;</span><div class="marker-content"><div class="marker-name">Initial Planning Point (IPP)</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_ipp_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_ipp_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_ipp_notes" placeholder="Notes"></div></div></div></div>
+        <div class="marker-row" id="markerRow_staging"><input type="checkbox" class="marker-checkbox" id="marker_staging" onchange="toggleMarker('staging')"><span class="marker-icon">&#9878;</span><div class="marker-content"><div class="marker-name">Staging Area</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_staging_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_staging_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_staging_notes" placeholder="Notes"></div></div></div></div>
+        <div class="marker-row" id="markerRow_roadblock"><input type="checkbox" class="marker-checkbox" id="marker_roadblock" onchange="toggleMarker('roadblock')"><span class="marker-icon">&#9940;</span><div class="marker-content"><div class="marker-name">Road Block / Access Point</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_roadblock_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_roadblock_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_roadblock_notes" placeholder="Notes"></div></div></div></div>
+        <div class="marker-row" id="markerRow_hazard"><input type="checkbox" class="marker-checkbox" id="marker_hazard" onchange="toggleMarker('hazard')"><span class="marker-icon">&#9888;</span><div class="marker-content"><div class="marker-name">Known Hazard</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_hazard_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_hazard_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_hazard_notes" placeholder="e.g. Cliff, mine shaft"></div></div></div></div>
+        <div class="marker-row" id="markerRow_wx_weather"><input type="checkbox" class="marker-checkbox" id="marker_wx_weather" onchange="toggleMarker('wx_weather')"><span class="marker-icon">&#9729;</span><div class="marker-content"><div class="marker-name">Wx-Weather</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_wx_weather_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_wx_weather_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_wx_weather_notes" placeholder="Notes"></div></div></div></div>
+        <div class="marker-row" id="markerRow_medical"><input type="checkbox" class="marker-checkbox" id="marker_medical" onchange="toggleMarker('medical')"><span class="marker-icon">&#9769;</span><div class="marker-content"><div class="marker-name">Medical Station</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_medical_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_medical_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_medical_notes" placeholder="Notes"></div></div></div></div>
+        <div class="marker-row" id="markerRow_terrain"><input type="checkbox" class="marker-checkbox" id="marker_terrain" onchange="toggleMarker('terrain')"><span class="marker-icon">&#9968;</span><div class="marker-content"><div class="marker-name">Terrain</div><div class="marker-fields"><div class="marker-coords"><input type="number" id="marker_terrain_lat" step="0.0001" placeholder="Lat"><input type="number" id="marker_terrain_lon" step="0.0001" placeholder="Lon"></div><div class="marker-notes"><input type="text" id="marker_terrain_notes" placeholder="e.g. Steep slope"></div></div></div></div>
+        <div class="button-group" style="margin-top:20px;">
+            <button type="button" class="btn btn-back" onclick="goToStep2()">&larr; Back</button>
+            <button type="button" class="btn btn-generate" onclick="generateSearchPlan()">Generate Search Plan</button>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">Generating search plan...</div>
+    <div id="results" class="results"></div>
+</div>
+
+<script>
+const PROFILES = { dementia:{r25:0.6,r50:1.2,r75:2.4,r95:8.0}, lost_child:{r25:0.4,r50:0.8,r75:1.6,r95:4.5}, lost_hiker:{r25:1.5,r50:3.0,r75:5.0,r95:25.0}, lost_hunter:{r25:1.0,r50:2.5,r75:4.0,r95:15.0}, lost_vehicle:{r25:3.0,r50:6.0,r75:10.0,r95:50.0}, mental_health:{r25:0.8,r50:1.5,r75:3.0,r95:8.0} };
+const MARKER_TYPES = ['icp','ipp','staging','roadblock','hazard','wx_weather','medical','terrain'];
+const KM_TO_MI = 0.621371;
+const MI_TO_KM = 1.60934;
+const ACRES_TO_SQKM = 0.00404686;
+let currentShape = 'grid', terrainSource = 'osm', currentUnits = 'standard';
+
+function setUnits(u) {
+    currentUnits = u;
+    document.getElementById('unit_std').classList.toggle('active', u==='standard');
+    document.getElementById('unit_met').classList.toggle('active', u==='metric');
+    const mi = u === 'standard';
+    document.getElementById('ringUnitLabel').textContent = mi ? 'Distances in miles' : 'Distances in km';
+    ['25','50','75','95'].forEach(p => document.getElementById('ring'+p+'unit').textContent = mi ? 'mi' : 'km');
+    document.getElementById('gridLabel').innerHTML = mi ? 'Grid Cell Size (acres)<span class="label-hint">Area of each square sector</span>' : 'Grid Cell Size (sq km)<span class="label-hint">Area of each square sector</span>';
+    document.getElementById('pieLabel').textContent = mi ? 'Max Sector Size (acres)' : 'Max Sector Size (sq km)';
+    if (mi) { document.getElementById('grid_cell_size').value = '30'; } else { document.getElementById('grid_cell_size').value = '0.12'; }
+    updateProfilePreview();
+}
+
+function setShape(s){currentShape=s;document.getElementById('shape_grid').classList.toggle('active',s==='grid');document.getElementById('shape_pie').classList.toggle('active',s==='pie');document.getElementById('gridOptions').classList.toggle('hidden',s!=='grid');document.getElementById('pieOptions').classList.toggle('active',s==='pie');}
+function toggleTerrainPanel(){document.getElementById('terrainSourcePanel').classList.toggle('active',document.getElementById('terrain_aware').checked);}
+function setTerrainSource(s){terrainSource=s;document.getElementById('src_osm').classList.toggle('active',s==='osm');document.getElementById('src_file').classList.toggle('active',s==='file');document.getElementById('osmInfo').style.display=s==='osm'?'block':'none';document.getElementById('fileUploadPanel').style.display=s==='file'?'block':'none';}
+function uploadTrailFile(){const f=document.getElementById('trail_file');if(!f.files[0])return;const fd=new FormData();fd.append('trail_file',f.files[0]);const st=document.getElementById('fileStatus');st.textContent='Uploading...';fetch('/upload-trail-file',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.success){st.textContent=d.filename+' — '+d.total_nodes.toLocaleString()+' nodes';st.className='file-status success';document.getElementById('fileUploadArea').classList.add('uploaded');}else{st.textContent='Error: '+d.error;}}).catch(e=>{st.textContent='Failed';});}
+function toggleRingRow(p){const c=document.getElementById('ring_'+p).checked;document.getElementById('ring_'+p+'_km').disabled=!c;document.getElementById('ringRow'+p).classList.toggle('checked',c);}
+function toggleMarker(t){document.getElementById('markerRow_'+t).classList.toggle('checked',document.getElementById('marker_'+t).checked);}
+function showStep(s){for(let i=1;i<=3;i++){document.getElementById('step'+i).classList.remove('active');document.getElementById('tab'+i).classList.remove('active');}document.getElementById('step'+s).classList.add('active');document.getElementById('tab'+s).classList.add('active');}
+
+function updateProfilePreview(){
+    const t=document.getElementById('subject_type').value;
+    const p=document.getElementById('profilePreview');
+    if(t&&PROFILES[t]){const pr=PROFILES[t];
+        if(currentUnits==='standard'){
+            p.innerHTML='<strong>Koester:</strong> 25%='+(pr.r25*KM_TO_MI).toFixed(2)+'mi | 50%='+(pr.r50*KM_TO_MI).toFixed(2)+'mi | 75%='+(pr.r75*KM_TO_MI).toFixed(2)+'mi | 95%='+(pr.r95*KM_TO_MI).toFixed(2)+'mi';
+            document.getElementById('ring_25_km').placeholder=(pr.r25*KM_TO_MI).toFixed(2);
+            document.getElementById('ring_50_km').placeholder=(pr.r50*KM_TO_MI).toFixed(2);
+            document.getElementById('ring_75_km').placeholder=(pr.r75*KM_TO_MI).toFixed(2);
+            document.getElementById('ring_95_km').placeholder=(pr.r95*KM_TO_MI).toFixed(2);
+        } else {
+            p.innerHTML='<strong>Koester:</strong> 25%='+pr.r25+'km | 50%='+pr.r50+'km | 75%='+pr.r75+'km | 95%='+pr.r95+'km';
+            document.getElementById('ring_25_km').placeholder=pr.r25;
+            document.getElementById('ring_50_km').placeholder=pr.r50;
+            document.getElementById('ring_75_km').placeholder=pr.r75;
+            document.getElementById('ring_95_km').placeholder=pr.r95;
+        }
+        p.style.display='block';
+    } else {p.style.display='none';}
+}
+
+function launchHasty(){const s=document.getElementById('subject_type').value,la=document.getElementById('latitude').value,lo=document.getElementById('longitude').value,n=document.getElementById('notes').value;if(!s||!la||!lo){alert('Fill in Subject Type, Latitude, Longitude.');return;}window.open('/hasty?subject_type='+encodeURIComponent(s)+'&lat='+la+'&lon='+lo+'&notes='+encodeURIComponent(n),'_blank');}
+function goToStep2(){const s=document.getElementById('subject_type').value,la=document.getElementById('latitude').value,lo=document.getElementById('longitude').value;if(!s||!la||!lo){alert('Fill in required fields.');return;}document.getElementById('step2Summary').innerHTML='<strong>Subject:</strong> '+s.replace('_',' ')+' | <strong>LKP:</strong> '+la+', '+lo;document.getElementById('tab1').classList.add('completed');updateProfilePreview();toggleRingRow(25);toggleRingRow(50);toggleRingRow(75);toggleRingRow(95);showStep(2);}
+function goToStep3(){document.getElementById('tab2').classList.add('completed');showStep(3);}
+function goToStep1(){showStep(1);}
+function getFormData(){return{subject_type:document.getElementById('subject_type').value,latitude:document.getElementById('latitude').value,longitude:document.getElementById('longitude').value,notes:document.getElementById('notes').value};}
+
+function getSearchParams(){
+    const p={sector_shape:currentShape,terrain_aware:document.getElementById('terrain_aware').checked,terrain_source:terrainSource};
+    ['25','50','75','95'].forEach(r=>{
+        if(document.getElementById('ring_'+r).checked){
+            p['ring_'+r]=true;
+            const v=document.getElementById('ring_'+r+'_km').value;
+            if(v){
+                p['ring_'+r+'_km'] = currentUnits==='standard' ? parseFloat(v)*MI_TO_KM : parseFloat(v);
+            }
+        }
+    });
+    // Grid cell size: convert acres to sq km, then to cell side length in km
+    const gcs = document.getElementById('grid_cell_size').value;
+    if(gcs){
+        if(currentUnits==='standard'){
+            p.grid_cell_km = Math.sqrt(parseFloat(gcs) * ACRES_TO_SQKM);
+        } else {
+            p.grid_cell_km = Math.sqrt(parseFloat(gcs));
+        }
+    }
+    const mss = document.getElementById('max_sector_size').value;
+    if(mss){
+        p.max_sector_sq_km = currentUnits==='standard' ? parseFloat(mss)*ACRES_TO_SQKM : parseFloat(mss);
+    }
+    const f={num_teams:'int',urgency_hours:'int'};
+    for(const[id,t]of Object.entries(f)){const v=document.getElementById(id).value;if(v)p[id]=t==='int'?parseInt(v):parseFloat(v);}
+    const c=document.getElementById('team_capability').value;if(c)p.team_capability=c;
+    return p;
+}
+
+function getMarkers(){const m=[];MARKER_TYPES.forEach(t=>{if(document.getElementById('marker_'+t).checked){const d={type:t};const la=document.getElementById('marker_'+t+'_lat').value,lo=document.getElementById('marker_'+t+'_lon').value;if(la)d.lat=la;if(lo)d.lon=lo;const n=document.getElementById('marker_'+t+'_notes').value;if(n)d.notes=n;m.push(d);}});return m;}
+function saveSearchPlan(){const d={subject_type:document.getElementById('subject_type').value,latitude:document.getElementById('latitude').value,longitude:document.getElementById('longitude').value,time_last_seen:document.getElementById('time_last_seen').value,age:document.getElementById('age').value,terrain:document.getElementById('terrain').value,notes:document.getElementById('notes').value};fetch('/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()).then(r=>{const m=document.getElementById('message');m.textContent=r.success?'Saved!':'Error';m.className=r.success?'message success':'message error';m.style.display='block';});}
+
+function generateSearchPlan(){
+    const data=getFormData();data.search_params=getSearchParams();data.markers=getMarkers();
+    const loading=document.getElementById('loading'),results=document.getElementById('results');results.style.display='none';
+    if(data.search_params.terrain_aware){loading.textContent='Fetching terrain data...';loading.classList.add('active');}
+    fetch('/generate-search-plan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.json()).then(d=>{
+        loading.classList.remove('active');
+        if(d.success){const z=d.zones;
+        let html='<h3>Search Plan ('+(z.sector_shape==='grid'?'Grid':'Pie')+')</h3>';
+        html+='<p><strong>Location:</strong> '+z.lat+', '+z.lon+'</p>';
+        html+='<p><strong>Rings:</strong> '+z.selected_rings.map(r=>r.pct+'%='+r.km.toFixed(2)+'km / '+(r.km*KM_TO_MI).toFixed(2)+'mi').join(' | ')+'</p>';
+        if(z.travel_direction)html+='<p><strong>Direction:</strong> '+z.travel_direction+'</p>';
+        if(z.terrain_aware&&z.terrain_stats){html+='<div class="terrain-info" style="margin:10px 0"><strong>Terrain:</strong> '+z.terrain_stats.total_nodes+' points</div>';}
+        const mk=getMarkers();if(mk.length>0)html+='<p><strong>Markers:</strong> '+mk.length+'</p>';
+        z.sector_data_all.forEach(ring=>{html+='<h3 style="margin-top:15px">'+ring.ring_label+' — '+ring.sectors.length+' sectors</h3><div class="sector-list">';ring.sectors.forEach(s=>{const wc=s.weight>1.0?' weight-high':'';let info=s.direction+' | Wt:'+s.weight+' | '+(s.area_acres||0)+' acres';if(s.trail_count!==undefined&&s.trail_count!==null)info+=' | T:'+s.trail_count;html+='<div class="sector-item"><span>'+s.label+'</span><span class="'+wc+'">'+info+'</span></div>';});html+='</div>';});
+        html+='<button class="btn btn-download" onclick="downloadCombined()">Download Search Plan KML</button>';
+        results.innerHTML=html;results.style.display='block';}
+    }).catch(e=>{loading.classList.remove('active');alert('Error: '+e);});
+}
+
+function downloadCombined(){const data=getFormData();data.search_params=getSearchParams();data.markers=getMarkers();fetch('/download-combined',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.blob()).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='MARLY_search_plan.kml';document.body.appendChild(a);a.click();document.body.removeChild(a);}).catch(e=>alert('Error: '+e));}
+</script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MARLY 1.0 - Hasty Search</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+.container { max-width: 640px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.header-text h1 { margin-bottom: 5px; color: #333; }
+.header-text .subtitle { color: #666; font-size: 14px; }
+.logo { width: 80px; height: auto; }
+.hasty-badge { display: inline-block; background: #dc6900; color: white; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-bottom: 20px; }
+.back-link { font-size: 13px; color: #0066cc; text-decoration: none; display: inline-block; margin-bottom: 20px; }
+.form-group { margin-bottom: 20px; }
+label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+.label-hint { font-weight: normal; font-size: 12px; color: #888; display: block; margin-top: 2px; }
+input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.two-col { display: flex; gap: 16px; }
+.two-col .form-group { flex: 1; }
+.section-label { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; margin-top: 20px; }
+.btn { width: 100%; padding: 14px; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; }
+.btn-generate { background: #dc6900; margin-top: 10px; }
+.btn-download { background: #28a745; margin-top: 10px; }
+.loading { display: none; padding: 15px; text-align: center; color: #666; }
+.loading.active { display: block; }
+.results { padding: 15px; margin-top: 20px; border-radius: 4px; background: #fff3e0; border: 1px solid #ffcc80; display: none; }
+.results h3 { margin-bottom: 10px; color: #e65100; }
+.results p { margin-bottom: 5px; font-size: 14px; }
+.corridor-list, .sector-list { margin-top: 10px; max-height: 200px; overflow-y: auto; }
+.corridor-item { padding: 8px 12px; margin: 4px 0; background: white; border-radius: 4px; font-size: 13px; display: flex; justify-content: space-between; border-left: 4px solid #dc6900; }
+.sector-item { padding: 6px 10px; margin: 3px 0; background: white; border-radius: 4px; font-size: 12px; display: flex; justify-content: space-between; }
+.sector-primary { border-left: 4px solid #0066cc; }
+.sector-alternate { border-left: 4px solid #e65100; }
+.subject-summary { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 12px; margin-bottom: 20px; font-size: 13px; }
+.cone-info { background: #fff3e0; border: 1px solid #ffcc80; border-radius: 4px; padding: 10px; margin: 10px 0; font-size: 13px; color: #e65100; }
+.unit-toggle { display: flex; gap: 0; margin-bottom: 20px; }
+.unit-option { flex: 1; padding: 8px; text-align: center; border: 2px solid #ddd; cursor: pointer; font-size: 13px; font-weight: bold; color: #666; }
+.unit-option:first-child { border-radius: 4px 0 0 4px; }
+.unit-option:last-child { border-radius: 0 4px 4px 0; }
+.unit-option.active { border-color: #0066cc; background: #e8f0fe; color: #0066cc; }
+.marker-compact { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+.marker-chip { display: flex; align-items: center; gap: 4px; padding: 6px 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-size: 13px; cursor: pointer; }
+.marker-chip.checked { background: #e8f0fe; border-color: #b8d4fe; }
+.marker-chip input { width: auto; }
+.marker-details { display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; }
+.marker-details.active { display: block; }
+.marker-detail-row { display: flex; gap: 8px; margin: 4px 0; align-items: center; }
+.marker-detail-row label { font-size: 12px; min-width: 60px; margin: 0; }
+.marker-detail-row input { padding: 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header"><div class="header-text"><h1>MARLY 1.0</h1><p class="subtitle">Model-Assisted Rescue for Lost-person recoverY</p></div><img src="/static/marly_logo.png" alt="MARLY Logo" class="logo"></div>
+    <span class="hasty-badge">HASTY SEARCH</span>
+    <a href="/" class="back-link">&larr; Back to Full Search Plan</a>
+    <div id="subjectSummary" class="subject-summary"></div>
+    <label>Units</label>
+    <div class="unit-toggle"><div class="unit-option active" id="unit_std" onclick="setUnits('standard')">Standard (mi/ft/acres)</div><div class="unit-option" id="unit_met" onclick="setUnits('metric')">Metric (km/m/sq km)</div></div>
+    <div class="section-label">Hasty Search Parameters</div>
+    <div class="form-group"><label>Search Ring</label><select id="ring_pct"><option value="25">25% Ring (closest)</option><option value="50" selected>50% Ring</option><option value="75">75% Ring</option></select></div>
+    <div class="form-group"><label id="custom_ring_label">Custom Ring Distance (miles)<span class="label-hint">Leave blank for Koester default</span></label><input type="number" id="custom_ring" step="0.1" min="0.1" placeholder="Auto from profile"></div>
+    <div class="two-col">
+        <div class="form-group"><label id="offset_label">Corridor Offset (feet)<span class="label-hint">Buffer each side</span></label><input type="number" id="offset_value" value="100" min="10" max="2000" step="10"></div>
+        <div class="form-group"><label id="sector_size_label">Sector Size (acres)<span class="label-hint">For gap areas</span></label><input type="number" id="sector_size" value="30" min="5" max="100" step="5"></div>
+    </div>
+    <div class="form-group"><label>Feature Type</label><select id="feature_type"><option value="both">Trails + Roads</option><option value="trails">Trails Only</option><option value="roads">Roads Only</option></select></div>
+    <div class="section-label">Operational Markers</div>
+    <div class="marker-compact">
+        <label class="marker-chip" id="chip_icp"><input type="checkbox" id="m_icp" onchange="toggleChip('icp')"> &#9873; ICP</label>
+        <label class="marker-chip" id="chip_ipp"><input type="checkbox" id="m_ipp" onchange="toggleChip('ipp')"> &#128205; IPP</label>
+        <label class="marker-chip" id="chip_staging"><input type="checkbox" id="m_staging" onchange="toggleChip('staging')"> &#9878; Staging</label>
+        <label class="marker-chip" id="chip_roadblock"><input type="checkbox" id="m_roadblock" onchange="toggleChip('roadblock')"> &#9940; Road Block</label>
+        <label class="marker-chip" id="chip_hazard"><input type="checkbox" id="m_hazard" onchange="toggleChip('hazard')"> &#9888; Hazard</label>
+        <label class="marker-chip" id="chip_wx_weather"><input type="checkbox" id="m_wx_weather" onchange="toggleChip('wx_weather')"> &#9729; Wx</label>
+        <label class="marker-chip" id="chip_medical"><input type="checkbox" id="m_medical" onchange="toggleChip('medical')"> &#9769; Medical</label>
+        <label class="marker-chip" id="chip_terrain"><input type="checkbox" id="m_terrain" onchange="toggleChip('terrain')"> &#9968; Terrain</label>
+    </div>
+    <div class="marker-details" id="markerDetails"><div id="markerFields"></div><p style="font-size:11px;color:#888;margin-top:5px;">Leave coordinates blank to auto-place.</p></div>
+    <button class="btn btn-generate" onclick="generateHasty()">Generate Hasty Search Plan</button>
+    <div id="loading" class="loading">Fetching trail data...</div>
+    <div id="results" class="results"><h3>Hasty Search Plan</h3><div id="resultsContent"></div></div>
+</div>
+<script>
+const PROFILES = { dementia:{r25:0.6,r50:1.2,r75:2.4,r95:8.0}, lost_child:{r25:0.4,r50:0.8,r75:1.6,r95:4.5}, lost_hiker:{r25:1.5,r50:3.0,r75:5.0,r95:25.0}, lost_hunter:{r25:1.0,r50:2.5,r75:4.0,r95:15.0}, mental_health:{r25:0.8,r50:1.5,r75:3.0,r95:8.0} };
+const MARKER_NAMES={icp:'ICP',ipp:'IPP',staging:'Staging',roadblock:'Road Block',hazard:'Hazard',wx_weather:'Wx-Weather',medical:'Medical',terrain:'Terrain'};
+const ALL_MARKERS=['icp','ipp','staging','roadblock','hazard','wx_weather','medical','terrain'];
+const KM_TO_MI=0.621371,FT_TO_M=0.3048;
+const params=new URLSearchParams(window.location.search);
+const subjectType=params.get('subject_type')||'',latitude=params.get('lat')||'',longitude=params.get('lon')||'',notes=params.get('notes')||'';
+let units='standard';
+
+function setUnits(u){units=u;document.getElementById('unit_std').classList.toggle('active',u==='standard');document.getElementById('unit_met').classList.toggle('active',u==='metric');if(u==='standard'){document.getElementById('custom_ring_label').innerHTML='Custom Ring Distance (miles)<span class="label-hint">Leave blank for default</span>';document.getElementById('offset_label').innerHTML='Corridor Offset (feet)<span class="label-hint">Buffer each side</span>';document.getElementById('sector_size_label').innerHTML='Sector Size (acres)<span class="label-hint">For gap areas</span>';document.getElementById('offset_value').value='100';document.getElementById('sector_size').value='30';}else{document.getElementById('custom_ring_label').innerHTML='Custom Ring Distance (km)';document.getElementById('offset_label').innerHTML='Corridor Offset (meters)';document.getElementById('sector_size_label').innerHTML='Sector Size (sq km)';document.getElementById('offset_value').value='30';document.getElementById('sector_size').value='0.12';}}
+function toggleChip(t){document.getElementById('chip_'+t).classList.toggle('checked',document.getElementById('m_'+t).checked);updateMarkerFields();}
+function updateMarkerFields(){const a=ALL_MARKERS.filter(t=>document.getElementById('m_'+t).checked);const c=document.getElementById('markerFields'),p=document.getElementById('markerDetails');if(!a.length){p.classList.remove('active');return;}p.classList.add('active');let h='';a.forEach(t=>{h+='<div style="font-weight:bold;font-size:13px;margin-top:8px;">'+MARKER_NAMES[t]+'</div><div class="marker-detail-row"><label>Lat:</label><input type="number" id="ml_'+t+'" step="0.0001" placeholder="Auto"><label>Lon:</label><input type="number" id="mo_'+t+'" step="0.0001" placeholder="Auto"></div><div class="marker-detail-row"><label>Notes:</label><input type="text" id="mn_'+t+'" placeholder="Optional"></div>';});c.innerHTML=h;}
+function getMarkers(){const m=[];ALL_MARKERS.forEach(t=>{if(document.getElementById('m_'+t).checked){const d={type:t};const la=document.getElementById('ml_'+t),lo=document.getElementById('mo_'+t),n=document.getElementById('mn_'+t);if(la&&la.value)d.lat=la.value;if(lo&&lo.value)d.lon=lo.value;if(n&&n.value)d.notes=n.value;m.push(d);}});return m;}
+
+const summary=document.getElementById('subjectSummary');
+if(subjectType&&latitude&&longitude){const p=PROFILES[subjectType];summary.innerHTML='<strong>Subject:</strong> '+subjectType.replace('_',' ')+' | <strong>LKP:</strong> '+latitude+', '+longitude+(notes?' | <strong>Notes:</strong> '+notes:'')+(p?'<br><strong>Koester:</strong> 25%='+(p.r25*KM_TO_MI).toFixed(2)+'mi | 50%='+(p.r50*KM_TO_MI).toFixed(2)+'mi | 75%='+(p.r75*KM_TO_MI).toFixed(2)+'mi':'');}
+else{summary.innerHTML='<span style="color:#c00">No subject data. Go back to main form.</span>';}
+
+function generateHasty(){
+    if(!subjectType||!latitude||!longitude){alert('No subject data.');return;}
+    let offset_m=parseFloat(document.getElementById('offset_value').value);
+    let sector_size_acres=parseFloat(document.getElementById('sector_size').value);
+    let custom_ring_km=null;const cv=document.getElementById('custom_ring').value;
+    if(units==='standard'){offset_m*=FT_TO_M;if(cv)custom_ring_km=parseFloat(cv)/KM_TO_MI;}else{sector_size_acres/=0.00404686;if(cv)custom_ring_km=parseFloat(cv);}
+    const data={subject_type:subjectType,latitude:latitude,longitude:longitude,notes:notes,ring_pct:document.getElementById('ring_pct').value,custom_ring_km:custom_ring_km,offset_meters:offset_m,sector_size_acres:sector_size_acres,feature_type:document.getElementById('feature_type').value,markers:getMarkers()};
+    document.getElementById('loading').classList.add('active');document.getElementById('results').style.display='none';
+    fetch('/generate-hasty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.json()).then(d=>{
+        document.getElementById('loading').classList.remove('active');
+        if(d.success){
+            let html='<p><strong>Search Ring:</strong> '+d.ring_mi+' mi ('+d.ring_km+' km)</p>';
+            html+='<p><strong>Raw Segments:</strong> '+d.total_ways+' → <strong>After Merge:</strong> '+d.merged_ways+'</p>';
+            html+='<p><strong>Trail Corridors:</strong> '+d.corridors+' | <strong>Gap Sectors:</strong> '+d.grid_sectors+' ('+d.sector_size_acres+' acres)</p>';
+            if(d.cone_info){html+='<div class="cone-info"><strong>Category Template:</strong> '+d.cone_info.primary_width+'° primary cone toward '+d.cone_info.direction;if(d.cone_info.alternate_width>0)html+=' + '+d.cone_info.alternate_width+'° alternate on each side';html+='</div>';}
+            const mk=getMarkers();if(mk.length>0)html+='<p><strong>Markers:</strong> '+mk.length+'</p>';
+            if(d.corridor_list.length>0){html+='<div class="section-label">Trail Corridors</div><div class="corridor-list">';d.corridor_list.forEach(c=>{html+='<div class="corridor-item"><span><strong>'+c.label+'</strong> — '+c.trail_name+'</span><span>'+c.direction+' | '+c.length_mi+' mi</span></div>';});html+='</div>';}
+            if(d.sector_list&&d.sector_list.length>0){html+='<div class="section-label">Gap Sectors</div><div class="sector-list">';d.sector_list.forEach(s=>{const zc=s.zone==='alternate'?'sector-alternate':'sector-primary';html+='<div class="sector-item '+zc+'"><span>'+s.label+'</span><span>'+s.direction+' | '+s.area_acres+' acres | '+s.zone+'</span></div>';});html+='</div>';}
+            if(d.corridors>0||d.grid_sectors>0){html+='<button class="btn btn-download" onclick="downloadHasty()">Download Hasty Search KML</button>';}
+            document.getElementById('resultsContent').innerHTML=html;document.getElementById('results').style.display='block';
+        }
+    }).catch(e=>{document.getElementById('loading').classList.remove('active');alert('Error: '+e);});
+}
+
+function downloadHasty(){
+    let offset_m=parseFloat(document.getElementById('offset_value').value);
+    let sector_size_acres=parseFloat(document.getElementById('sector_size').value);
+    let custom_ring_km=null;const cv=document.getElementById('custom_ring').value;
+    if(units==='standard'){offset_m*=FT_TO_M;if(cv)custom_ring_km=parseFloat(cv)/KM_TO_MI;}else{sector_size_acres/=0.00404686;if(cv)custom_ring_km=parseFloat(cv);}
+    const data={subject_type:subjectType,latitude:latitude,longitude:longitude,notes:notes,ring_pct:document.getElementById('ring_pct').value,custom_ring_km:custom_ring_km,offset_meters:offset_m,sector_size_acres:sector_size_acres,markers:getMarkers()};
+    fetch('/download-hasty',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(r=>r.blob()).then(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='MARLY_hasty_search.kml';document.body.appendChild(a);a.click();document.body.removeChild(a);}).catch(e=>alert('Error: '+e));
+}
+</script>
+</body>
+</html>
