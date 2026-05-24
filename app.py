@@ -287,6 +287,139 @@ def filter_trail_nodes_by_radius(trail_nodes, center_lat, center_lon, radius_km)
 
 # --- Terrain data ---
 
+# --- Weather (Open-Meteo, no API key, free for non-commercial use) ---
+
+WEATHER_CODES = {
+    0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+    45: 'Fog', 48: 'Depositing rime fog',
+    51: 'Light drizzle', 53: 'Moderate drizzle', 55: 'Dense drizzle',
+    56: 'Light freezing drizzle', 57: 'Dense freezing drizzle',
+    61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+    66: 'Light freezing rain', 67: 'Heavy freezing rain',
+    71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow', 77: 'Snow grains',
+    80: 'Slight rain showers', 81: 'Moderate rain showers', 82: 'Violent rain showers',
+    85: 'Slight snow showers', 86: 'Heavy snow showers',
+    95: 'Thunderstorm', 96: 'Thunderstorm w/ slight hail', 99: 'Thunderstorm w/ heavy hail'
+}
+
+def deg_to_compass(deg):
+    if deg is None: return ''
+    dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+    return dirs[int((deg % 360) / 22.5 + 0.5) % 16]
+
+def fetch_current_weather(lat, lon, units='standard'):
+    """Fetch current weather + short forecast from Open-Meteo. Returns a dict or None on failure."""
+    temp_unit = 'fahrenheit' if units == 'standard' else 'celsius'
+    wind_unit = 'mph' if units == 'standard' else 'kmh'
+    precip_unit = 'inch' if units == 'standard' else 'mm'
+    url = 'https://api.open-meteo.com/v1/forecast'
+    params = {
+        'latitude': lat, 'longitude': lon,
+        'current': 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+        'daily': 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,sunrise,sunset',
+        'temperature_unit': temp_unit,
+        'wind_speed_unit': wind_unit,
+        'precipitation_unit': precip_unit,
+        'forecast_days': 1,
+        'timezone': 'auto'
+    }
+    try:
+        r = requests.get(url, params=params, timeout=10)
+        if r.status_code != 200: return None
+        data = r.json()
+        cur = data.get('current', {})
+        if not cur: return None
+        # Parse daily forecast (3 days returned)
+        daily_raw = data.get('daily', {})
+        forecast = []
+        if daily_raw and daily_raw.get('time'):
+            for i in range(len(daily_raw['time'])):
+                forecast.append({
+                    'date': daily_raw['time'][i],
+                    'code': (daily_raw.get('weather_code') or [None]*99)[i],
+                    'conditions': WEATHER_CODES.get((daily_raw.get('weather_code') or [None]*99)[i], 'Unknown'),
+                    'high': (daily_raw.get('temperature_2m_max') or [None]*99)[i],
+                    'low': (daily_raw.get('temperature_2m_min') or [None]*99)[i],
+                    'precip_sum': (daily_raw.get('precipitation_sum') or [None]*99)[i],
+                    'precip_prob': (daily_raw.get('precipitation_probability_max') or [None]*99)[i],
+                    'wind_max': (daily_raw.get('wind_speed_10m_max') or [None]*99)[i],
+                    'gust_max': (daily_raw.get('wind_gusts_10m_max') or [None]*99)[i],
+                    'sunrise': (daily_raw.get('sunrise') or [None]*99)[i],
+                    'sunset': (daily_raw.get('sunset') or [None]*99)[i],
+                })
+        return {
+            'temp': cur.get('temperature_2m'),
+            'feels_like': cur.get('apparent_temperature'),
+            'humidity': cur.get('relative_humidity_2m'),
+            'precip': cur.get('precipitation'),
+            'wind_speed': cur.get('wind_speed_10m'),
+            'wind_dir_deg': cur.get('wind_direction_10m'),
+            'wind_dir_compass': deg_to_compass(cur.get('wind_direction_10m')),
+            'wind_gust': cur.get('wind_gusts_10m'),
+            'weather_code': cur.get('weather_code'),
+            'conditions': WEATHER_CODES.get(cur.get('weather_code'), 'Unknown'),
+            'time': cur.get('time'),
+            'temp_unit': '°F' if units == 'standard' else '°C',
+            'wind_unit': 'mph' if units == 'standard' else 'km/h',
+            'precip_unit': 'in' if units == 'standard' else 'mm',
+            'forecast': forecast
+        }
+    except Exception as e:
+        print(f"Weather fetch error: {e}")
+        return None
+
+def format_weather_description(w):
+    """Format a weather dict (current + forecast) into a human-readable description for the KML marker."""
+    if not w: return 'Weather data unavailable'
+    lines = []
+    lines.append('=== CURRENT CONDITIONS ===')
+    lines.append(f"Conditions: {w['conditions']}")
+    if w.get('temp') is not None:
+        line = f"Temperature: {w['temp']}{w['temp_unit']}"
+        if w.get('feels_like') is not None:
+            line += f" (feels like {w['feels_like']}{w['temp_unit']})"
+        lines.append(line)
+    if w.get('humidity') is not None:
+        lines.append(f"Humidity: {w['humidity']}%")
+    if w.get('wind_speed') is not None:
+        line = f"Wind: {w['wind_speed']} {w['wind_unit']}"
+        if w.get('wind_dir_compass'):
+            line += f" from {w['wind_dir_compass']}"
+        if w.get('wind_gust') is not None:
+            line += f" (gusts to {w['wind_gust']} {w['wind_unit']})"
+        lines.append(line)
+    if w.get('precip') is not None and w['precip'] > 0:
+        lines.append(f"Precipitation: {w['precip']} {w['precip_unit']}")
+    if w.get('time'):
+        lines.append(f"Observed: {w['time']}")
+
+    # Forecast section (today only)
+    forecast = w.get('forecast') or []
+    if forecast:
+        day = forecast[0]
+        lines.append('')
+        lines.append('=== TODAY\'S FORECAST ===')
+        lines.append(f"Conditions: {day.get('conditions','')}")
+        if day.get('high') is not None and day.get('low') is not None:
+            lines.append(f"High: {day['high']}{w['temp_unit']}  /  Low: {day['low']}{w['temp_unit']}")
+        if day.get('precip_prob') is not None or day.get('precip_sum') is not None:
+            p_parts = []
+            if day.get('precip_prob') is not None: p_parts.append(f"{day['precip_prob']}% chance")
+            if day.get('precip_sum') is not None and day['precip_sum'] > 0: p_parts.append(f"{day['precip_sum']} {w['precip_unit']} total")
+            if p_parts: lines.append(f"Precip: {' / '.join(p_parts)}")
+        if day.get('wind_max') is not None:
+            w_line = f"Wind max: {day['wind_max']} {w['wind_unit']}"
+            if day.get('gust_max') is not None: w_line += f" (gusts {day['gust_max']} {w['wind_unit']})"
+            lines.append(w_line)
+        if day.get('sunrise') and day.get('sunset'):
+            sr = day['sunrise'].split('T')[-1][:5] if 'T' in str(day['sunrise']) else day['sunrise']
+            ss = day['sunset'].split('T')[-1][:5] if 'T' in str(day['sunset']) else day['sunset']
+            lines.append(f"Sunrise: {sr}  Sunset: {ss}")
+
+    lines.append('')
+    lines.append('Source: Open-Meteo')
+    return '\n'.join(lines)
+
 def fetch_trail_data(lat, lon, radius_km):
     rm = int(radius_km * 1000)
     query = '[out:json][timeout:30];(way["highway"~"path|track|footway|bridleway|cycleway"](around:' + str(rm) + ',' + str(lat) + ',' + str(lon) + ');way["highway"~"residential|tertiary|secondary|primary|unclassified|service"](around:' + str(rm) + ',' + str(lat) + ',' + str(lon) + '););out body;>;out skel qt;'
@@ -753,12 +886,19 @@ def download_hasty():
 
     markers_input = data.get('markers', [])
     processed_markers = []; di = 0
+    weather_units = data.get('search_params', {}).get('units', 'standard')
+    lkp_weather = None
+    if any(m.get('type') == 'wx_weather' for m in markers_input):
+        lkp_weather = fetch_current_weather(lat, lon, weather_units)
     for m in markers_input:
         mi = MARKER_TYPES.get(m['type'], {})
         mlat, mlon = m.get('lat'), m.get('lon')
         if mlat and mlon: mlat, mlon = float(mlat), float(mlon)
         else: mlat, mlon = default_marker_position(lat, lon, ring_km, di); di += 1
-        processed_markers.append({'lat': mlat, 'lon': mlon, 'name': mi.get('name', m['type']), 'type': m['type'], 'notes': m.get('notes', '')})
+        notes = m.get('notes', '')
+        if m['type'] == 'wx_weather':
+            notes = (notes + '\n\n' if notes else '') + format_weather_description(lkp_weather)
+        processed_markers.append({'lat': mlat, 'lon': mlon, 'name': mi.get('name', m['type']), 'type': m['type'], 'notes': notes})
 
     kml_data = build_hasty_kml(lat, lon, ring_km, corridors, grid_sectors, processed_markers)
     return Response(kml_data, mimetype='application/vnd.google-earth.kml+xml', headers={'Content-Disposition': 'attachment;filename=MARLY_hasty_search.kml'})
@@ -773,12 +913,21 @@ def download_combined():
     markers_input = data.get('markers', [])
     third_ring_km = zones['selected_rings'][2]['km'] if len(zones['selected_rings']) > 2 else zones['selected_rings'][-1]['km']
     processed_markers = []; di = 0
+    weather_units = params.get('units', 'standard')
+    # Fetch weather once for the LKP if any Weather marker is present
+    lkp_weather = None
+    if any(m.get('type') == 'wx_weather' for m in markers_input):
+        lkp_weather = fetch_current_weather(lat, lon, weather_units)
     for m in markers_input:
         mi = MARKER_TYPES.get(m['type'], {})
         mlat, mlon = m.get('lat'), m.get('lon')
         if mlat and mlon: mlat, mlon = float(mlat), float(mlon)
         else: mlat, mlon = default_marker_position(lat, lon, third_ring_km, di); di += 1
-        processed_markers.append({'lat': mlat, 'lon': mlon, 'name': mi.get('name', m['type']), 'type': m['type'], 'notes': m.get('notes', '')})
+        notes = m.get('notes', '')
+        # Weather marker: append current LKP weather to notes
+        if m['type'] == 'wx_weather':
+            notes = (notes + '\n\n' if notes else '') + format_weather_description(lkp_weather)
+        processed_markers.append({'lat': mlat, 'lon': mlon, 'name': mi.get('name', m['type']), 'type': m['type'], 'notes': notes})
 
     kml_data = build_combined_kml(lat, lon, zones['selected_rings'], zones['sector_data_all'], markers=processed_markers, sector_shape=params.get('sector_shape', 'grid'), grid_cell_km=params.get('grid_cell_km'), max_sector_sq_km=params.get('max_sector_sq_km'), corridors=zones.get('corridors'))
     return Response(kml_data, mimetype='application/vnd.google-earth.kml+xml', headers={'Content-Disposition': 'attachment;filename=MARLY_search_plan.kml'})
