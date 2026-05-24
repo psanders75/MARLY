@@ -833,11 +833,34 @@ def calculate_search_zones(lat, lon, subject_type, notes, params):
         corridor_feature_type = params.get('corridor_feature_type', 'both')
         corridors_list = build_corridors_from_data(lat, lon, outer_km_full, ways_data, corridor_offset_m, corridor_feature_type)
 
+        # Per-ring corridor filter: classify each corridor by which ring its avg distance falls into,
+        # then drop it if the user unchecked Corridors for that ring.
+        if corridors_list:
+            filtered = []
+            for c in corridors_list:
+                d = c['avg_dist_km']
+                ring_pct_for_corridor = None
+                prev_radius = 0
+                for r in selected_rings:
+                    if prev_radius < d <= r['km']:
+                        ring_pct_for_corridor = r['pct']
+                        break
+                    prev_radius = r['km']
+                # Corridor inside the innermost ring or past the outermost
+                if ring_pct_for_corridor is None:
+                    ring_pct_for_corridor = selected_rings[0]['pct'] if d <= selected_rings[0]['km'] else selected_rings[-1]['pct']
+                if params.get(f'corridors_{ring_pct_for_corridor}', True):
+                    c['ring_pct'] = ring_pct_for_corridor
+                    filtered.append(c)
+            corridors_list = filtered
+
     sector_shape = params.get('sector_shape', 'grid')
     grid_cell_km = params.get('grid_cell_km')
     max_sector_sq_km = params.get('max_sector_sq_km')
     radii = [r['km'] for r in selected_rings]
     sector_data_all = []
+    MAX_SECTORS_GLOBAL = 500
+    total_sector_count = 0
 
     for i in range(len(selected_rings)):
         inner_km = radii[i-1] if i > 0 else 0
@@ -845,6 +868,26 @@ def calculate_search_zones(lat, lon, subject_type, notes, params):
         pct = selected_rings[i]['pct']
         priority = i + 1
         ring_label = f'P{priority} ({pct}% ring)'
+
+        # Per-ring sector toggle: only generate sectors if the user opted in for this ring.
+        # Default True if param is missing (keeps API backward-compatible for older calls).
+        sectors_enabled_for_ring = params.get(f'sectors_{pct}', True)
+
+        # Skip sector generation for this ring if:
+        #  - User unchecked "Sectors" for this specific ring, OR
+        #  - This ring's percentile is > 75% (corridors-only zone per spec), OR
+        #  - We've already hit the global 500-sector cap from inner rings
+        skip_sectors = (not sectors_enabled_for_ring) or (pct > 75) or (total_sector_count >= MAX_SECTORS_GLOBAL)
+
+        if skip_sectors:
+            if not sectors_enabled_for_ring:
+                skip_reason = 'sectors_off_this_ring'
+            elif pct > 75:
+                skip_reason = 'outer_band_75_95'
+            else:
+                skip_reason = 'capped_at_500'
+            sector_data_all.append({'ring_label': ring_label, 'inner_km': inner_km, 'outer_km': outer_km, 'pct': pct, 'priority': priority, 'sectors': [], 'skipped': True, 'skip_reason': skip_reason})
+            continue
 
         if sector_shape == 'grid':
             cell_km = float(grid_cell_km) if grid_cell_km else 0.35
@@ -883,6 +926,11 @@ def calculate_search_zones(lat, lon, subject_type, notes, params):
                     curr_lon += co; col_idx += 1
                 curr_lat += cl; row += 1
             cells.sort(key=lambda c: (0 if c.get('is_lkp') else 1, 0 if c['zone'] == 'primary' else 1, c['dist']))
+            # Truncate to fit within global 500-sector cap (counts across rings)
+            remaining = MAX_SECTORS_GLOBAL - total_sector_count
+            if len(cells) > remaining:
+                cells = cells[:remaining]
+            total_sector_count += len(cells)
             suffix = '' if i == 0 else chr(64+i)
             for j, cell in enumerate(cells):
                 cell['label'] = f'Sector-{j+1:02d}{suffix}'
@@ -914,17 +962,22 @@ def calculate_search_zones(lat, lon, subject_type, notes, params):
                         pie_sectors.append({'direction': sector, 'label': f'Sector-{sn:02d}{suffix}', 'priority': priority, 'weight': w, 'area_sq_km': round(area/subs, 2), 'area_acres': round((area/subs)/ACRES_TO_SQKM, 1), 'trail_count': int(tc) if terrain_aware else None, 'zone': zone}); sn += 1
                 else:
                     pie_sectors.append({'direction': sector, 'label': f'Sector-{sn:02d}{suffix}', 'priority': priority, 'weight': w, 'area_sq_km': round(area, 2), 'area_acres': round(area/ACRES_TO_SQKM, 1), 'trail_count': int(tc) if terrain_aware else None, 'zone': zone}); sn += 1
+            # Truncate to fit within global 500-sector cap
+            remaining = MAX_SECTORS_GLOBAL - total_sector_count
+            if len(pie_sectors) > remaining:
+                pie_sectors = pie_sectors[:remaining]
+            total_sector_count += len(pie_sectors)
             sector_data_all.append({'ring_label': ring_label, 'inner_km': inner_km, 'outer_km': outer_km, 'pct': pct, 'priority': priority, 'sectors': pie_sectors})
 
     cone_info = None
     if direction_angle_val is not None and template['requires_direction']:
         cone_info = {'direction': travel_direction, 'subject_type': subject_type, 'primary_width': template['primary_half_width'] * 2, 'alternate_width': (template['alternate_half_width'] - template['primary_half_width']) * 2 if template['alternate_half_width'] > 0 else 0}
 
-    result = {'lat': lat, 'lon': lon, 'selected_rings': selected_rings, 'travel_direction': travel_direction, 'sector_shape': sector_shape, 'terrain_aware': terrain_aware, 'sector_data_all': sector_data_all, 'search_params': params, 'cone_info': cone_info}
+    result = {'lat': lat, 'lon': lon, 'selected_rings': selected_rings, 'travel_direction': travel_direction, 'sector_shape': sector_shape, 'terrain_aware': terrain_aware, 'sector_data_all': sector_data_all, 'search_params': params, 'cone_info': cone_info, 'total_sectors': total_sector_count, 'sector_cap': MAX_SECTORS_GLOBAL}
     if terrain_aware: result['terrain_stats'] = terrain_stats
     if corridor_enabled:
         result['corridors'] = corridors_list
-        result['corridor_list'] = [{'label': c['label'], 'trail_name': c['trail_name'], 'direction': c['direction'], 'type': c['type'], 'length_km': round(c['length_km'], 2), 'length_mi': round(c['length_km']/MI_TO_KM, 2), 'avg_dist_km': c['avg_dist_km']} for c in corridors_list]
+        result['corridor_list'] = [{'label': c['label'], 'trail_name': c['trail_name'], 'direction': c['direction'], 'type': c['type'], 'length_km': round(c['length_km'], 2), 'length_mi': round(c['length_km']/MI_TO_KM, 2), 'avg_dist_km': c['avg_dist_km'], 'ring_pct': c.get('ring_pct')} for c in corridors_list]
     return result
 
 if __name__ == '__main__':

@@ -62,6 +62,9 @@ textarea { resize: vertical; min-height: 80px; }
 .ring-label { font-size: 14px; font-weight: bold; min-width: 50px; }
 .ring-distance { width: 80px; padding: 6px 8px; font-size: 13px; text-align: center; }
 .ring-km { font-size: 13px; color: #666; }
+.ring-sectors-wrap { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+.ring-sectors-wrap input[disabled] { opacity: 0.5; }
+.ring-sectors-wrap.disabled { color: #aaa; }
 .ring-pct-25 { border-left: 4px solid #28a745; } .ring-pct-50 { border-left: 4px solid #ffc107; }
 .ring-pct-75 { border-left: 4px solid #fd7e14; } .ring-pct-95 { border-left: 4px solid #dc3545; }
 .section-label { font-size: 15px; font-weight: bold; color: #333; margin-bottom: 10px; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; }
@@ -104,8 +107,9 @@ textarea { resize: vertical; min-height: 80px; }
     <div class="step-panel active" id="step1">
         <div class="form-group"><label>Subject Type *</label><select id="subject_type" required onchange="updateProfilePreview()"><option value="">-- Select --</option><option value="dementia">Dementia / Alzheimer's</option><option value="lost_child">Lost Child</option><option value="lost_hiker">Lost Hiker</option><option value="lost_hunter">Lost Hunter</option><option value="mental_health">Mental Health Crisis</option></select></div>
         <div id="profilePreview" class="profile-preview" style="display:none;"></div>
-        <div class="form-group"><label>Last Known Latitude *</label><input type="number" id="latitude" step="0.0001" required placeholder="e.g. 35.6870"></div>
-        <div class="form-group"><label>Last Known Longitude *</label><input type="number" id="longitude" step="0.0001" required placeholder="e.g. -105.9378"></div>
+        <div class="form-group"><label>Last Known Position (Lat, Lon) *</label><input type="text" id="lkp_coords" required placeholder="e.g. 35.6870, -105.9378" oninput="parseLKPCoords()"><div id="lkp_parse_status" style="font-size:11px;color:#888;margin-top:4px"></div></div>
+        <input type="hidden" id="latitude">
+        <input type="hidden" id="longitude">
         <div class="form-group field-disabled"><label>Time Last Seen <span class="disabled-hint">(not yet used in planning)</span></label><input type="datetime-local" id="time_last_seen" disabled></div>
         <div class="two-col">
             <div class="form-group field-disabled"><label>Age <span class="disabled-hint">(not yet used)</span></label><input type="number" id="age" min="0" max="130" placeholder="e.g. 67" disabled></div>
@@ -129,10 +133,10 @@ textarea { resize: vertical; min-height: 80px; }
         </div>
         <div class="section-label">Probability Rings</div>
         <div id="ringUnitLabel" style="font-size:12px;color:#888;margin-bottom:8px;">Distances in miles</div>
-        <div class="ring-row ring-pct-25" id="ringRow25"><input type="checkbox" class="ring-checkbox" id="ring_25" onchange="toggleRingRow(25)"><span class="ring-label">25%</span><input type="number" class="ring-distance" id="ring_25_km" step="0.1" min="0.1" disabled><span class="ring-km" id="ring25unit">mi</span></div>
-        <div class="ring-row ring-pct-50 checked" id="ringRow50"><input type="checkbox" class="ring-checkbox" id="ring_50" checked onchange="toggleRingRow(50)"><span class="ring-label">50%</span><input type="number" class="ring-distance" id="ring_50_km" step="0.1" min="0.1"><span class="ring-km" id="ring50unit">mi</span></div>
-        <div class="ring-row ring-pct-75" id="ringRow75"><input type="checkbox" class="ring-checkbox" id="ring_75" onchange="toggleRingRow(75)"><span class="ring-label">75%</span><input type="number" class="ring-distance" id="ring_75_km" step="0.1" min="0.1" disabled><span class="ring-km" id="ring75unit">mi</span></div>
-        <div class="ring-row ring-pct-95 checked" id="ringRow95"><input type="checkbox" class="ring-checkbox" id="ring_95" checked onchange="toggleRingRow(95)"><span class="ring-label">95%</span><input type="number" class="ring-distance" id="ring_95_km" step="0.1" min="0.1"><span class="ring-km" id="ring95unit">mi</span></div>
+        <div class="ring-row ring-pct-25" id="ringRow25"><input type="checkbox" class="ring-checkbox" id="ring_25" onchange="toggleRingRow(25)"><span class="ring-label">25%</span><input type="number" class="ring-distance" id="ring_25_km" step="0.1" min="0.1" disabled><span class="ring-km" id="ring25unit">mi</span><label class="ring-sectors-wrap"><input type="checkbox" id="sectors_25" checked> Sectors</label><label class="ring-sectors-wrap"><input type="checkbox" id="corridors_25" checked> Corridors</label></div>
+        <div class="ring-row ring-pct-50 checked" id="ringRow50"><input type="checkbox" class="ring-checkbox" id="ring_50" checked onchange="toggleRingRow(50)"><span class="ring-label">50%</span><input type="number" class="ring-distance" id="ring_50_km" step="0.1" min="0.1"><span class="ring-km" id="ring50unit">mi</span><label class="ring-sectors-wrap"><input type="checkbox" id="sectors_50" checked> Sectors</label><label class="ring-sectors-wrap"><input type="checkbox" id="corridors_50" checked> Corridors</label></div>
+        <div class="ring-row ring-pct-75" id="ringRow75"><input type="checkbox" class="ring-checkbox" id="ring_75" onchange="toggleRingRow(75)"><span class="ring-label">75%</span><input type="number" class="ring-distance" id="ring_75_km" step="0.1" min="0.1" disabled><span class="ring-km" id="ring75unit">mi</span><label class="ring-sectors-wrap disabled" title="Disabled for now"><input type="checkbox" id="sectors_75" disabled> Sectors</label><label class="ring-sectors-wrap"><input type="checkbox" id="corridors_75" checked> Corridors</label></div>
+        <div class="ring-row ring-pct-95 checked" id="ringRow95"><input type="checkbox" class="ring-checkbox" id="ring_95" checked onchange="toggleRingRow(95)"><span class="ring-label">95%</span><input type="number" class="ring-distance" id="ring_95_km" step="0.1" min="0.1"><span class="ring-km" id="ring95unit">mi</span><label class="ring-sectors-wrap disabled" title="Disabled for now"><input type="checkbox" id="sectors_95" disabled> Sectors</label><label class="ring-sectors-wrap"><input type="checkbox" id="corridors_95" checked> Corridors</label></div>
         <div class="section-label" style="margin-top:20px">Sector Configuration</div>
         <label>Sector Shape</label>
         <div class="shape-toggle"><div class="shape-option active" id="shape_grid" onclick="setShape('grid')">&#9632; Grid Squares (default)</div><div class="shape-option" id="shape_pie" onclick="setShape('pie')">&#9660; Pie Sectors</div></div>
@@ -188,6 +192,40 @@ let currentShape='grid', terrainSource='osm', currentUnits='standard';
 
 function setUnits(u){currentUnits=u;document.getElementById('unit_std').classList.toggle('active',u==='standard');document.getElementById('unit_met').classList.toggle('active',u==='metric');const mi=u==='standard';document.getElementById('ringUnitLabel').textContent=mi?'Distances in miles':'Distances in km';['25','50','75','95'].forEach(p=>document.getElementById('ring'+p+'unit').textContent=mi?'mi':'km');document.getElementById('gridLabel').textContent=mi?'Grid Cell Size (acres)':'Grid Cell Size (sq km)';document.getElementById('pieLabel').textContent=mi?'Max Sector Size (acres)':'Max Sector Size (sq km)';document.getElementById('grid_cell_size').value=mi?'30':'0.12';document.getElementById('corridorOffsetLabel').innerHTML=(mi?'Corridor Offset (feet)':'Corridor Offset (meters)')+'<span class="label-hint">Buffer each side of path</span>';document.getElementById('corridor_offset').value=mi?'100':'30';updateProfilePreview();}
 function setShape(s){currentShape=s;document.getElementById('shape_grid').classList.toggle('active',s==='grid');document.getElementById('shape_pie').classList.toggle('active',s==='pie');document.getElementById('gridOptions').classList.toggle('hidden',s!=='grid');document.getElementById('pieOptions').classList.toggle('active',s==='pie');}
+function parseLKPCoords(){
+    const raw=document.getElementById('lkp_coords').value.trim();
+    const status=document.getElementById('lkp_parse_status');
+    document.getElementById('latitude').value='';
+    document.getElementById('longitude').value='';
+    if(!raw){status.textContent='';status.style.color='#888';return;}
+    // Accept formats: "35.687,-105.938" / "35.687, -105.938" / "35.687 -105.938" / "35.687  -105.938"
+    // Also degree symbol or "N/S/E/W" suffix variants: "35.687° N, 105.938° W"
+    let cleaned=raw.replace(/°/g,'').replace(/\s+/g,' ').trim();
+    // Convert N/S/E/W suffix form to signed decimal
+    const cardinal=/^([\d.]+)\s*([NS])[,\s]+([\d.]+)\s*([EW])$/i;
+    const cm=cleaned.match(cardinal);
+    let lat,lon;
+    if(cm){
+        lat=parseFloat(cm[1])*(cm[2].toUpperCase()==='S'?-1:1);
+        lon=parseFloat(cm[3])*(cm[4].toUpperCase()==='W'?-1:1);
+    } else {
+        // Split on comma OR whitespace
+        const parts=cleaned.split(/[,\s]+/).filter(p=>p.length>0);
+        if(parts.length>=2){
+            lat=parseFloat(parts[0]);
+            lon=parseFloat(parts[1]);
+        }
+    }
+    if(isNaN(lat)||isNaN(lon)||lat<-90||lat>90||lon<-180||lon>180){
+        status.textContent='Could not parse coordinates. Use "lat, lon" format.';
+        status.style.color='#c00';
+        return;
+    }
+    document.getElementById('latitude').value=lat;
+    document.getElementById('longitude').value=lon;
+    status.textContent='Parsed: '+lat.toFixed(4)+', '+lon.toFixed(4);
+    status.style.color='#080';
+}
 function toggleTerrainPanel(){document.getElementById('terrainSourcePanel').classList.toggle('active',document.getElementById('terrain_aware').checked);}
 function toggleCorridorPanel(){document.getElementById('corridorPanel').classList.toggle('active',document.getElementById('corridor_enabled').checked);}
 function setTerrainSource(s){terrainSource=s;document.getElementById('src_osm').classList.toggle('active',s==='osm');document.getElementById('src_file').classList.toggle('active',s==='file');document.getElementById('osmInfo').style.display=s==='osm'?'block':'none';document.getElementById('fileUploadPanel').style.display=s==='file'?'block':'none';}
@@ -201,7 +239,7 @@ function goToStep2(){const s=document.getElementById('subject_type').value,la=do
 function goToStep3(){document.getElementById('tab2').classList.add('completed');showStep(3);}
 function goToStep1(){showStep(1);}
 function getFormData(){return{subject_type:document.getElementById('subject_type').value,latitude:document.getElementById('latitude').value,longitude:document.getElementById('longitude').value,notes:document.getElementById('notes').value};}
-function getSearchParams(){const p={sector_shape:currentShape,terrain_aware:document.getElementById('terrain_aware').checked,terrain_source:terrainSource};['25','50','75','95'].forEach(r=>{if(document.getElementById('ring_'+r).checked){p['ring_'+r]=true;const v=document.getElementById('ring_'+r+'_km').value;if(v)p['ring_'+r+'_km']=currentUnits==='standard'?parseFloat(v)*MI_TO_KM:parseFloat(v);}});const gcs=document.getElementById('grid_cell_size').value;if(gcs)p.grid_cell_km=currentUnits==='standard'?Math.sqrt(parseFloat(gcs)*ACRES_TO_SQKM):Math.sqrt(parseFloat(gcs));const mss=document.getElementById('max_sector_size').value;if(mss)p.max_sector_sq_km=currentUnits==='standard'?parseFloat(mss)*ACRES_TO_SQKM:parseFloat(mss);const c=document.getElementById('team_capability').value;if(c)p.team_capability=c;if(document.getElementById('corridor_enabled').checked){p.corridor_enabled=true;const co=parseFloat(document.getElementById('corridor_offset').value);if(co)p.corridor_offset_m=currentUnits==='standard'?co*FT_TO_M:co;p.corridor_feature_type=document.getElementById('corridor_feature_type').value;}return p;}
+function getSearchParams(){const p={sector_shape:currentShape,terrain_aware:document.getElementById('terrain_aware').checked,terrain_source:terrainSource};['25','50','75','95'].forEach(r=>{if(document.getElementById('ring_'+r).checked){p['ring_'+r]=true;const v=document.getElementById('ring_'+r+'_km').value;if(v)p['ring_'+r+'_km']=currentUnits==='standard'?parseFloat(v)*MI_TO_KM:parseFloat(v);p['sectors_'+r]=document.getElementById('sectors_'+r).checked;p['corridors_'+r]=document.getElementById('corridors_'+r).checked;}});const gcs=document.getElementById('grid_cell_size').value;if(gcs)p.grid_cell_km=currentUnits==='standard'?Math.sqrt(parseFloat(gcs)*ACRES_TO_SQKM):Math.sqrt(parseFloat(gcs));const mss=document.getElementById('max_sector_size').value;if(mss)p.max_sector_sq_km=currentUnits==='standard'?parseFloat(mss)*ACRES_TO_SQKM:parseFloat(mss);const c=document.getElementById('team_capability').value;if(c)p.team_capability=c;if(document.getElementById('corridor_enabled').checked){p.corridor_enabled=true;const co=parseFloat(document.getElementById('corridor_offset').value);if(co)p.corridor_offset_m=currentUnits==='standard'?co*FT_TO_M:co;p.corridor_feature_type=document.getElementById('corridor_feature_type').value;}return p;}
 function getMarkers(){const m=[];MARKER_TYPES.forEach(t=>{if(document.getElementById('marker_'+t).checked){const d={type:t};const la=document.getElementById('marker_'+t+'_lat').value,lo=document.getElementById('marker_'+t+'_lon').value;if(la)d.lat=la;if(lo)d.lon=lo;const n=document.getElementById('marker_'+t+'_notes').value;if(n)d.notes=n;m.push(d);}});return m;}
 function saveSearchPlan(){const d={subject_type:document.getElementById('subject_type').value,latitude:document.getElementById('latitude').value,longitude:document.getElementById('longitude').value,time_last_seen:document.getElementById('time_last_seen').value,age:document.getElementById('age').value,terrain:document.getElementById('terrain').value,notes:document.getElementById('notes').value};fetch('/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(r=>r.json()).then(r=>{const m=document.getElementById('message');m.textContent=r.success?'Saved!':'Error';m.className=r.success?'message success':'message error';m.style.display='block';});}
 
@@ -219,9 +257,22 @@ function generateSearchPlan(){
         if(z.cone_info){html+='<div class="cone-info"><strong>Category Template:</strong> '+z.cone_info.subject_type.replace('_',' ')+' — '+z.cone_info.primary_width+'° primary cone toward '+z.cone_info.direction;if(z.cone_info.alternate_width>0)html+=' + '+z.cone_info.alternate_width+'° alternate';html+='</div>';}
         if(z.terrain_aware&&z.terrain_stats){html+='<div class="terrain-info" style="margin:10px 0"><strong>Terrain:</strong> '+z.terrain_stats.total_nodes+' points</div>';}
         if(z.corridor_list&&z.corridor_list.length>0){html+='<div class="terrain-info" style="margin:10px 0;background:#fff3e0;border-color:#ffcc80;color:#e65100"><strong>Corridors:</strong> '+z.corridor_list.length+' trail/road corridor(s)</div>';}
+        html+='<div class="terrain-info" style="margin:10px 0;background:#e3f2fd;border-color:#90caf9;color:#0d47a1"><strong>Sectors:</strong> '+z.total_sectors+' generated (cap: '+z.sector_cap+')'+(z.total_sectors>=z.sector_cap?' — cap reached':'')+'</div>';
         const mk=getMarkers();if(mk.length>0)html+='<p><strong>Markers:</strong> '+mk.length+'</p>';
-        z.sector_data_all.forEach(ring=>{html+='<h3 style="margin-top:15px">'+ring.ring_label+' — '+ring.sectors.length+' sectors</h3><div class="sector-list">';ring.sectors.forEach(s=>{const wc=s.weight>1.0?' weight-high':'';const zc=s.zone==='alternate'?' zone-alt':'';const lkpTag=s.is_lkp?' <span style="color:#0066cc;font-weight:bold">[LKP]</span>':'';let info=s.direction+' | Wt:'+s.weight+' | '+(s.area_acres||0)+' acres | '+s.zone;if(s.trail_count!==undefined&&s.trail_count!==null)info+=' | T:'+s.trail_count;html+='<div class="sector-item"><span>'+s.label+lkpTag+'</span><span class="'+wc+zc+'">'+info+'</span></div>';});html+='</div>';});
-        if(z.corridor_list&&z.corridor_list.length>0){html+='<h3 style="margin-top:15px">Trail/Road Corridors — '+z.corridor_list.length+'</h3><div class="sector-list">';z.corridor_list.forEach(c=>{html+='<div class="sector-item"><span><strong>'+c.label+'</strong> — '+c.trail_name+'</span><span>'+c.direction+' | '+c.length_mi+' mi | '+c.type+'</span></div>';});html+='</div>';}
+        z.sector_data_all.forEach(ring=>{
+            if(ring.skipped){
+                let reason='';
+                if(ring.skip_reason==='sectors_off_this_ring')reason=' — ring only (sectors off)';
+                else if(ring.skip_reason==='outer_band_75_95')reason=' — corridors only (>75%)';
+                else if(ring.skip_reason==='capped_at_500')reason=' — 500-sector cap reached';
+                html+='<h3 style="margin-top:15px;color:#888">'+ring.ring_label+reason+'</h3>';
+                return;
+            }
+            html+='<h3 style="margin-top:15px">'+ring.ring_label+' — '+ring.sectors.length+' sectors</h3><div class="sector-list">';
+            ring.sectors.forEach(s=>{const wc=s.weight>1.0?' weight-high':'';const zc=s.zone==='alternate'?' zone-alt':'';const lkpTag=s.is_lkp?' <span style="color:#0066cc;font-weight:bold">[LKP]</span>':'';let info=s.direction+' | Wt:'+s.weight+' | '+(s.area_acres||0)+' acres | '+s.zone;if(s.trail_count!==undefined&&s.trail_count!==null)info+=' | T:'+s.trail_count;html+='<div class="sector-item"><span>'+s.label+lkpTag+'</span><span class="'+wc+zc+'">'+info+'</span></div>';});
+            html+='</div>';
+        });
+        if(z.corridor_list&&z.corridor_list.length>0){html+='<h3 style="margin-top:15px">Trail/Road Corridors — '+z.corridor_list.length+'</h3><div class="sector-list">';z.corridor_list.forEach(c=>{const ringTag=c.ring_pct?' ['+c.ring_pct+'%]':'';html+='<div class="sector-item"><span><strong>'+c.label+'</strong> — '+c.trail_name+ringTag+'</span><span>'+c.direction+' | '+c.length_mi+' mi | '+c.type+'</span></div>';});html+='</div>';}
         html+='<button class="btn btn-download" onclick="downloadCombined()">Download Search Plan KML</button>';
         results.innerHTML=html;results.style.display='block';}
     }).catch(e=>{loading.classList.remove('active');alert('Error: '+e);});
